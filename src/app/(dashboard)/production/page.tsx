@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChefHat, Info, Scale } from "lucide-react"
 
-const recipes = [
+const initialRecipes = [
     {
         id: 1,
         parent: "Pan Baguette (x100u)",
@@ -43,10 +43,24 @@ const recipes = [
 ]
 
 export default function ProductionPage() {
+    const [recipes, setRecipes] = useState(initialRecipes)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [newRecipe, setNewRecipe] = useState({ name: "", base: "" })
 
     const handleCreate = () => {
+        if (!newRecipe.name) {
+            toast.error("El nombre de la receta es obligatorio")
+            return
+        }
+        setRecipes([...recipes, {
+            id: recipes.length + 1,
+            parent: newRecipe.name,
+            ingredients: [
+                { name: "Harina Base", qty: Number(newRecipe.base) || 1, unit: "Kg" }
+            ]
+        }])
         setIsDialogOpen(false)
+        setNewRecipe({ name: "", base: "" })
         toast.success("Receta creada exitosamente")
     }
 
@@ -72,16 +86,23 @@ export default function ProductionPage() {
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                    Nombre
-                                </Label>
-                                <Input id="name" placeholder="Ej: Pan de Campo..." className="col-span-3" />
+                                <Label htmlFor="name" className="text-right">Nombre</Label>
+                                <Input
+                                    id="name"
+                                    className="col-span-3"
+                                    value={newRecipe.name}
+                                    onChange={(e) => setNewRecipe({ ...newRecipe, name: e.target.value })}
+                                />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="base" className="text-right">
-                                    Base (Harina)
-                                </Label>
-                                <Input id="base" type="number" placeholder="Kg" className="col-span-3" />
+                                <Label htmlFor="base" className="text-right">Base (Harina)</Label>
+                                <Input
+                                    id="base"
+                                    type="number"
+                                    className="col-span-3"
+                                    value={newRecipe.base}
+                                    onChange={(e) => setNewRecipe({ ...newRecipe, base: e.target.value })}
+                                />
                             </div>
                         </div>
                         <DialogFooter>

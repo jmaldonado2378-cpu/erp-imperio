@@ -34,7 +34,7 @@ import { Plus, Search, Filter, ArrowUpDown } from "lucide-react"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 
-const inventoryItems = [
+const initialItems = [
     { id: 1, code: "HAR-000-01", description: "Harina de Trigo 000", category: "Insumos", stock: 1500, unit: "Kg" },
     { id: 2, code: "LEV-FRE-01", description: "Levadura Fresca Prensada", category: "Insumos", stock: 25, unit: "Kg" },
     { id: 3, code: "GRA-MAR-01", description: "Margarina para Hojaldre", category: "Insumos", stock: 80, unit: "Kg" },
@@ -43,11 +43,38 @@ const inventoryItems = [
 ]
 
 export default function InventoryPage() {
-    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [items, setItems] = useState(initialItems)
+    const [isNewItemOpen, setIsNewItemOpen] = useState(false)
+    const [isPurchaseOpen, setIsPurchaseOpen] = useState(false)
+    const [newItem, setNewItem] = useState({ code: "", description: "", category: "", stock: 0, unit: "Kg" })
+    const [purchase, setPurchase] = useState({ itemId: "", qty: "" })
 
     const handleCreate = () => {
-        setIsDialogOpen(false)
+        if (!newItem.code || !newItem.description) {
+            toast.error("Complete todos los campos obligatorios")
+            return
+        }
+        setItems([...items, { ...newItem, id: items.length + 1 }])
+        setIsNewItemOpen(false)
+        setNewItem({ code: "", description: "", category: "", stock: 0, unit: "Kg" })
         toast.success("Artículo creado correctamente")
+    }
+
+    const handlePurchase = () => {
+        if (!purchase.itemId || !purchase.qty) {
+            toast.error("Seleccione un item y cantidad")
+            return
+        }
+        const updatedItems = items.map(item => {
+            if (item.id.toString() === purchase.itemId) {
+                return { ...item, stock: item.stock + Number(purchase.qty) }
+            }
+            return item
+        })
+        setItems(updatedItems)
+        setIsPurchaseOpen(false)
+        setPurchase({ itemId: "", qty: "" })
+        toast.success("Stock actualizado correctamente")
     }
 
     return (
@@ -62,53 +89,103 @@ export default function InventoryPage() {
                     <p className="text-muted-foreground">Gestión de existencias e insumos.</p>
                 </div>
 
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" /> Nuevo Artículo
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Crear Nuevo Artículo</DialogTitle>
-                            <DialogDescription>
-                                Complete los datos del nuevo insumo o producto.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="code" className="text-right">
-                                    Código
-                                </Label>
-                                <Input id="code" placeholder="Ej: HAR-000-01" className="col-span-3" />
+                <div className="flex gap-2">
+                    <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline">
+                                <Plus className="mr-2 h-4 w-4" /> Registrar Compra
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Registrar Compra (Entrada)</DialogTitle>
+                                <DialogDescription>
+                                    Ingrese los detalles de la factura de compra.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="item" className="text-right">Item</Label>
+                                    <Select onValueChange={(v) => setPurchase({ ...purchase, itemId: v })}>
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Seleccionar..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {items.map(i => (
+                                                <SelectItem key={i.id} value={i.id.toString()}>{i.description}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="qty" className="text-right">Cantidad</Label>
+                                    <Input
+                                        id="qty"
+                                        type="number"
+                                        className="col-span-3"
+                                        value={purchase.qty}
+                                        onChange={(e) => setPurchase({ ...purchase, qty: e.target.value })}
+                                    />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                    Nombre
-                                </Label>
-                                <Input id="name" placeholder="Harina..." className="col-span-3" />
+                            <DialogFooter>
+                                <Button type="submit" onClick={handlePurchase}>Confirmar Ingreso</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={isNewItemOpen} onOpenChange={setIsNewItemOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" /> Nuevo Artículo
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Crear Nuevo Artículo</DialogTitle>
+                                <DialogDescription>
+                                    Complete los datos del nuevo insumo o producto.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="code" className="text-right">Código</Label>
+                                    <Input
+                                        id="code"
+                                        className="col-span-3"
+                                        value={newItem.code}
+                                        onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">Nombre</Label>
+                                    <Input
+                                        id="name"
+                                        className="col-span-3"
+                                        value={newItem.description}
+                                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="category" className="text-right">Categoría</Label>
+                                    <Select onValueChange={(v) => setNewItem({ ...newItem, category: v })}>
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Seleccionar..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Insumos">Insumos</SelectItem>
+                                            <SelectItem value="Producción">Producción</SelectItem>
+                                            <SelectItem value="Empaque">Empaque</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="category" className="text-right">
-                                    Categoría
-                                </Label>
-                                <Select>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue placeholder="Seleccionar..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="insumos">Insumos</SelectItem>
-                                        <SelectItem value="produccion">Producción</SelectItem>
-                                        <SelectItem value="empaque">Empaque</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" onClick={handleCreate}>Guardar Artículo</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                            <DialogFooter>
+                                <Button type="submit" onClick={handleCreate}>Guardar Artículo</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -125,7 +202,7 @@ export default function InventoryPage() {
                         <CardTitle className="text-sm font-medium">Bajo Stock</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-orange-500">3 Items</div>
+                        <div className="text-2xl font-bold text-orange-500">{items.filter(i => i.stock < 100).length} Items</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -160,7 +237,7 @@ export default function InventoryPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {inventoryItems.map((item) => (
+                            {items.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-mono font-medium">{item.code}</TableCell>
                                     <TableCell>{item.description}</TableCell>
@@ -176,6 +253,7 @@ export default function InventoryPage() {
                                         <Button variant="ghost" size="sm" asChild>
                                             <Link href={`/inventory/${item.id}`}>Ver</Link>
                                         </Button>
+                                        {/* Added delete/edit placeholder if needed, users asked for "actions" generally */}
                                     </TableCell>
                                 </TableRow>
                             ))}

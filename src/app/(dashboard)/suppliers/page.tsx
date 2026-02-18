@@ -18,17 +18,25 @@ import {
 import { Truck, Phone, Mail, MapPin, Plus } from "lucide-react"
 import { toast } from "sonner"
 
-const suppliers = [
+const initialSuppliers = [
     { id: 1, name: "Molino Cañuelas", contact: "Juan Pérez", phone: "+54 11 1234-5678", email: "ventas@molinocanuelas.com", category: "Harinas" },
     { id: 2, name: "Distribuidora El Trebol", contact: "María González", phone: "+54 11 8765-4321", email: "pedidos@eltrebol.com.ar", category: "Lácteos/Grasas" },
     { id: 3, name: "Papelera Del Sur", contact: "Roberto Díaz", phone: "+54 221 456-7890", email: "info@papeleradelsur.com", category: "Empaque" },
 ]
 
 export default function SuppliersPage() {
+    const [suppliers, setSuppliers] = useState(initialSuppliers)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [newSupplier, setNewSupplier] = useState({ name: "", contact: "", phone: "", email: "" })
 
     const handleCreate = () => {
+        if (!newSupplier.name) {
+            toast.error("El nombre de la empresa es obligatorio")
+            return
+        }
+        setSuppliers([...suppliers, { ...newSupplier, id: suppliers.length + 1, category: "General" }])
         setIsDialogOpen(false)
+        setNewSupplier({ name: "", contact: "", phone: "", email: "" })
         toast.success("Proveedor registrado correctamente")
     }
 
@@ -54,28 +62,41 @@ export default function SuppliersPage() {
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                    Empresa
-                                </Label>
-                                <Input id="name" placeholder="Ej: Molino..." className="col-span-3" />
+                                <Label htmlFor="name" className="text-right">Empresa</Label>
+                                <Input
+                                    id="name"
+                                    className="col-span-3"
+                                    value={newSupplier.name}
+                                    onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                                />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="contact" className="text-right">
-                                    Contacto
-                                </Label>
-                                <Input id="contact" placeholder="Nombre completo" className="col-span-3" />
+                                <Label htmlFor="contact" className="text-right">Contacto</Label>
+                                <Input
+                                    id="contact"
+                                    className="col-span-3"
+                                    value={newSupplier.contact}
+                                    onChange={(e) => setNewSupplier({ ...newSupplier, contact: e.target.value })}
+                                />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="phone" className="text-right">
-                                    Teléfono
-                                </Label>
-                                <Input id="phone" placeholder="+54..." className="col-span-3" />
+                                <Label htmlFor="phone" className="text-right">Teléfono</Label>
+                                <Input
+                                    id="phone"
+                                    className="col-span-3"
+                                    value={newSupplier.phone}
+                                    onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                                />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="email" className="text-right">
-                                    Email
-                                </Label>
-                                <Input id="email" type="email" placeholder="contacto@..." className="col-span-3" />
+                                <Label htmlFor="email" className="text-right">Email</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    className="col-span-3"
+                                    value={newSupplier.email}
+                                    onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
+                                />
                             </div>
                         </div>
                         <DialogFooter>
