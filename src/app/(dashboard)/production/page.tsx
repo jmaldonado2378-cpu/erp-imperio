@@ -52,21 +52,30 @@ export default function ProductionPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Ingrediente (Insumo)</TableHead>
+                                        <TableHead className="text-right">%</TableHead>
                                         <TableHead className="text-right">Cantidad</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {recipe.ingredients.map((ing, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell className="font-medium">{ing.name}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Scale className="h-3 w-3 text-muted-foreground" />
-                                                    {ing.qty} {ing.unit}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {recipe.ingredients.map((ing, i) => {
+                                        const flour = recipe.ingredients.find(i => i.name.includes("Harina"))?.qty || 1
+                                        const pct = ((ing.qty / flour) * 100).toFixed(1)
+
+                                        return (
+                                            <TableRow key={i}>
+                                                <TableCell className="font-medium">{ing.name}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <span className="font-mono text-xs text-muted-foreground mr-2">{pct}%</span>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Scale className="h-3 w-3 text-muted-foreground" />
+                                                        {ing.qty} {ing.unit}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
                                 </TableBody>
                             </Table>
                             <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground bg-muted p-2 rounded">

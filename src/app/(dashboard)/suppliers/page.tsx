@@ -1,9 +1,22 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { Truck, Phone, Mail, MapPin, Plus } from "lucide-react"
+import { toast } from "sonner"
 
 const suppliers = [
     { id: 1, name: "Molino Cañuelas", contact: "Juan Pérez", phone: "+54 11 1234-5678", email: "ventas@molinocanuelas.com", category: "Harinas" },
@@ -12,6 +25,13 @@ const suppliers = [
 ]
 
 export default function SuppliersPage() {
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+    const handleCreate = () => {
+        setIsDialogOpen(false)
+        toast.success("Proveedor registrado correctamente")
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -19,9 +39,50 @@ export default function SuppliersPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Proveedores</h1>
                     <p className="text-muted-foreground">Gestión de compras y contactos externos.</p>
                 </div>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" /> Nuevo Proveedor
-                </Button>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" /> Nuevo Proveedor
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Registrar Proveedor</DialogTitle>
+                            <DialogDescription>
+                                Ingrese los datos de contacto del nuevo proveedor.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                    Empresa
+                                </Label>
+                                <Input id="name" placeholder="Ej: Molino..." className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="contact" className="text-right">
+                                    Contacto
+                                </Label>
+                                <Input id="contact" placeholder="Nombre completo" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="phone" className="text-right">
+                                    Teléfono
+                                </Label>
+                                <Input id="phone" placeholder="+54..." className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">
+                                    Email
+                                </Label>
+                                <Input id="email" type="email" placeholder="contacto@..." className="col-span-3" />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit" onClick={handleCreate}>Guardar Proveedor</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <Card>
