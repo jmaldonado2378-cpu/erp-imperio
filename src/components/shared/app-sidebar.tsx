@@ -9,6 +9,7 @@ import {
     Settings,
     ShoppingCart,
     Store,
+    Truck,
 } from "lucide-react"
 
 import {
@@ -49,6 +50,11 @@ const data = {
             title: "Movimientos",
             url: "/history",
             icon: History,
+        },
+        {
+            title: "Proveedores",
+            url: "/suppliers",
+            icon: Truck,
         },
     ],
 }

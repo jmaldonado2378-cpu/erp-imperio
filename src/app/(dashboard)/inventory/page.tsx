@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import {
     Table,
     TableBody,
@@ -11,8 +12,27 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { Plus, Search, Filter, ArrowUpDown } from "lucide-react"
 import { motion } from "framer-motion"
+import { toast } from "sonner"
 
 const inventoryItems = [
     { id: 1, code: "HAR-000-01", description: "Harina de Trigo 000", category: "Insumos", stock: 1500, unit: "Kg" },
@@ -23,6 +43,13 @@ const inventoryItems = [
 ]
 
 export default function InventoryPage() {
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+    const handleCreate = () => {
+        setIsDialogOpen(false)
+        toast.success("Artículo creado correctamente")
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -34,9 +61,54 @@ export default function InventoryPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
                     <p className="text-muted-foreground">Gestión de existencias e insumos.</p>
                 </div>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" /> Nuevo Artículo
-                </Button>
+
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" /> Nuevo Artículo
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Crear Nuevo Artículo</DialogTitle>
+                            <DialogDescription>
+                                Complete los datos del nuevo insumo o producto.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="code" className="text-right">
+                                    Código
+                                </Label>
+                                <Input id="code" placeholder="Ej: HAR-000-01" className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                    Nombre
+                                </Label>
+                                <Input id="name" placeholder="Harina..." className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="category" className="text-right">
+                                    Categoría
+                                </Label>
+                                <Select>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="Seleccionar..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="insumos">Insumos</SelectItem>
+                                        <SelectItem value="produccion">Producción</SelectItem>
+                                        <SelectItem value="empaque">Empaque</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit" onClick={handleCreate}>Guardar Artículo</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -101,7 +173,9 @@ export default function InventoryPage() {
                                         {item.stock} {item.unit}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button variant="ghost" size="sm">Ver</Button>
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <Link href={`/inventory/${item.id}`}>Ver</Link>
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -112,3 +186,4 @@ export default function InventoryPage() {
         </motion.div>
     )
 }
+
