@@ -1,5 +1,19 @@
 "use client"
 
+import { useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +43,13 @@ const recipes = [
 ]
 
 export default function ProductionPage() {
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+    const handleCreate = () => {
+        setIsDialogOpen(false)
+        toast.success("Receta creada exitosamente")
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -36,6 +57,38 @@ export default function ProductionPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Producción y Recetas</h1>
                     <p className="text-muted-foreground">Gestión de Escandallo y composiciones.</p>
                 </div>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <ChefHat className="mr-2 h-4 w-4" /> Nueva Receta
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Crear Nueva Receta</DialogTitle>
+                            <DialogDescription>
+                                Defina el producto final y sus ingredientes base.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                    Nombre
+                                </Label>
+                                <Input id="name" placeholder="Ej: Pan de Campo..." className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="base" className="text-right">
+                                    Base (Harina)
+                                </Label>
+                                <Input id="base" type="number" placeholder="Kg" className="col-span-3" />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit" onClick={handleCreate}>Guardar Receta</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
