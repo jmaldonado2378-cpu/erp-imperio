@@ -48,7 +48,7 @@ export default function DashboardPage() {
                 <motion.div variants={item}>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Insumos</CardTitle>
+                            <CardTitle className="text-sm font-medium">Materias Primas</CardTitle>
                             <Package className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
@@ -111,7 +111,7 @@ export default function DashboardPage() {
                                             <Package className="h-4 w-4 text-primary" />
                                         </div>
                                         <div className="grid gap-1">
-                                            <p className="text-sm font-medium leading-none">Harina 000 - Bolsa 50kg</p>
+                                            <p className="text-sm font-medium leading-none">Harina 000 - Saco 50kg</p>
                                             <p className="text-xs text-muted-foreground">Transferencia a ALM-01-SEC</p>
                                         </div>
                                         <div className="ml-auto font-medium">+10</div>
