@@ -31,37 +31,65 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Plus, Search, Filter, ArrowUpDown } from "lucide-react"
+import { Plus, Search, Filter, ArrowUpDown, Archive } from "lucide-react"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 
 export default function InventoryPage() {
     const [items, setItems] = useState<any[]>([])
+    const [warehouses, setWarehouses] = useState<any[]>([])
     const [isNewItemOpen, setIsNewItemOpen] = useState(false)
     const [isPurchaseOpen, setIsPurchaseOpen] = useState(false)
-    const [newItem, setNewItem] = useState({ code: "", description: "", category: "Insumos", stock: 0, unit: "Kg" })
-    const [purchase, setPurchase] = useState({ itemId: "", qty: "" })
+
+    // New Item State (Extended)
+    const [newItem, setNewItem] = useState({
+        code: "",
+        description: "",
+        category: "Insumos",
+        unit: "Kg",
+        purchasing_unit: "Unidad",
+        conversion_factor: "1"
+    })
+
+    // Purchase State (Now with Warehouse)
+    const [purchase, setPurchase] = useState({
+        itemId: "",
+        warehouseId: "",
+        qty: "0"
+    })
+
     const [loading, setLoading] = useState(true)
 
-    // Fetch Items from Supabase
-    const fetchItems = async () => {
+    // Fetch Items (Aggregate View)
+    const fetchGameData = async () => {
         setLoading(true)
-        const { data, error } = await supabase
-            .from('insumos')
+        // 1. Fetch Stock View
+        const { data: stockData, error: stockError } = await supabase
+            .from('view_stock_total')
             .select('*')
             .order('id', { ascending: true })
 
-        if (error) {
-            console.error(error)
+        // 2. Fetch Warehouses for Selector
+        const { data: whData } = await supabase
+            .from('warehouses')
+            .select('*')
+            .order('id', { ascending: true })
+
+        if (stockError) {
+            console.error(stockError)
             toast.error("Error cargando inventario")
         } else {
-            setItems(data || [])
+            setItems(stockData || [])
+            setWarehouses(whData || [])
+            // Set default warehouse (Seco)
+            const defaultWh = whData?.find(w => w.code === 'ALM-01-SEC')
+            if (defaultWh) setPurchase(prev => ({ ...prev, warehouseId: defaultWh.id.toString() }))
         }
         setLoading(false)
     }
 
     useEffect(() => {
-        fetchItems()
+        fetchGameData()
     }, [])
 
     const handleCreate = async () => {
@@ -76,8 +104,9 @@ export default function InventoryPage() {
                 code: newItem.code,
                 description: newItem.description,
                 category: newItem.category,
-                // stock defaults to 0 if not provided or provided
-                unit: newItem.unit
+                unit: newItem.unit,
+                purchasing_unit: newItem.purchasing_unit,
+                conversion_factor: Number(newItem.conversion_factor)
             }])
 
         if (error) {
@@ -85,35 +114,56 @@ export default function InventoryPage() {
         } else {
             toast.success("Artículo creado correctamente")
             setIsNewItemOpen(false)
-            setNewItem({ code: "", description: "", category: "Insumos", stock: 0, unit: "Kg" })
-            fetchItems() // Refresh list
+            setNewItem({
+                code: "", description: "", category: "Insumos",
+                unit: "Kg", purchasing_unit: "Unidad", conversion_factor: "1"
+            })
+            fetchGameData()
         }
     }
 
     const handlePurchase = async () => {
-        if (!purchase.itemId || !purchase.qty) {
-            toast.error("Seleccione un item y cantidad")
+        if (!purchase.itemId || !purchase.qty || !purchase.warehouseId) {
+            toast.error("Complete todos los datos de ingreso")
             return
         }
 
-        // Optimistic UI update or fetch? Let's do fetch for safety first.
-        const currentItem = items.find(i => i.id.toString() === purchase.itemId)
-        if (!currentItem) return
+        // Find if record exists in inventory_levels
+        const { data: existingLevel } = await supabase
+            .from('inventory_levels')
+            .select('*')
+            .eq('insumo_id', purchase.itemId)
+            .eq('warehouse_id', purchase.warehouseId)
+            .single()
 
-        const newStock = Number(currentItem.stock) + Number(purchase.qty)
+        let error;
 
-        const { error } = await supabase
-            .from('insumos')
-            .update({ stock: newStock })
-            .eq('id', purchase.itemId)
+        if (existingLevel) {
+            // Update
+            const newQty = Number(existingLevel.quantity) + Number(purchase.qty)
+            const { error: upError } = await supabase
+                .from('inventory_levels')
+                .update({ quantity: newQty, last_updated: new Date().toISOString() })
+                .eq('id', existingLevel.id)
+            error = upError
+        } else {
+            // Insert
+            const { error: inError } = await supabase
+                .from('inventory_levels')
+                .insert([{
+                    insumo_id: purchase.itemId,
+                    warehouse_id: purchase.warehouseId,
+                    quantity: Number(purchase.qty)
+                }])
+            error = inError
+        }
 
         if (error) {
-            toast.error("Error al actualizar stock: " + error.message)
+            toast.error("Error al registrar entrada: " + error.message)
         } else {
-            toast.success("Compra registrada. Stock actualizado.")
+            toast.success("Ingreso registrado en Almacén.")
             setIsPurchaseOpen(false)
-            setPurchase({ itemId: "", qty: "" })
-            fetchItems()
+            fetchGameData()
         }
     }
 
@@ -125,30 +175,46 @@ export default function InventoryPage() {
         >
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Inventario</h1>
-                    <p className="text-muted-foreground">Gestión de existencias e insumos.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Inventario Global</h1>
+                    <p className="text-muted-foreground">Visión agregada de todos los almacenes.</p>
                 </div>
 
                 <div className="flex gap-2">
                     <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline">
-                                <Plus className="mr-2 h-4 w-4" /> Registrar Compra
+                                <Archive className="mr-2 h-4 w-4" /> Registrar Entrada (WMS)
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
-                                <DialogTitle>Registrar Compra (Entrada)</DialogTitle>
+                                <DialogTitle>Recepción de Mercadería</DialogTitle>
                                 <DialogDescription>
-                                    Ingrese los detalles de la factura de compra.
+                                    Ingrese insumos al almacén específico.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="wh" className="text-right">Almacén Destino</Label>
+                                    <Select
+                                        value={purchase.warehouseId}
+                                        onValueChange={(v) => setPurchase({ ...purchase, warehouseId: v })}
+                                    >
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Seleccionar Almacén..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {warehouses.map(w => (
+                                                <SelectItem key={w.id} value={w.id.toString()}>{w.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
                                     <Label htmlFor="item" className="text-right">Item</Label>
                                     <Select onValueChange={(v) => setPurchase({ ...purchase, itemId: v })}>
                                         <SelectTrigger className="col-span-3">
-                                            <SelectValue placeholder="Seleccionar..." />
+                                            <SelectValue placeholder="Seleccionar insumo..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {items.map(i => (
@@ -165,11 +231,12 @@ export default function InventoryPage() {
                                         className="col-span-3"
                                         value={purchase.qty}
                                         onChange={(e) => setPurchase({ ...purchase, qty: e.target.value })}
+                                        placeholder="Unidad Base"
                                     />
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button type="submit" onClick={handlePurchase}>Confirmar Ingreso</Button>
+                                <Button type="submit" onClick={handlePurchase}>Confirmar Recepción</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -177,51 +244,78 @@ export default function InventoryPage() {
                     <Dialog open={isNewItemOpen} onOpenChange={setIsNewItemOpen}>
                         <DialogTrigger asChild>
                             <Button>
-                                <Plus className="mr-2 h-4 w-4" /> Nuevo Artículo
+                                <Plus className="mr-2 h-4 w-4" /> Nuevo SKU
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="sm:max-w-[500px]">
                             <DialogHeader>
-                                <DialogTitle>Crear Nuevo Artículo</DialogTitle>
+                                <DialogTitle>Alta de Insumo (Maestro)</DialogTitle>
                                 <DialogDescription>
-                                    Complete los datos del nuevo insumo o producto.
+                                    Defina las unidades de compra y consumo.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
                                 <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="code" className="text-right">Código</Label>
+                                    <Label className="text-right">Código</Label>
                                     <Input
-                                        id="code"
                                         className="col-span-3"
                                         value={newItem.code}
                                         onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
                                     />
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">Nombre</Label>
+                                    <Label className="text-right">Descripción</Label>
                                     <Input
-                                        id="name"
                                         className="col-span-3"
                                         value={newItem.description}
                                         onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                                     />
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="category" className="text-right">Categoría</Label>
-                                    <Select onValueChange={(v) => setNewItem({ ...newItem, category: v })}>
-                                        <SelectTrigger className="col-span-3">
-                                            <SelectValue placeholder="Seleccionar..." />
-                                        </SelectTrigger>
+                                    <Label className="text-right">Categoría</Label>
+                                    <Select
+                                        value={newItem.category}
+                                        onValueChange={(v) => setNewItem({ ...newItem, category: v })}
+                                    >
+                                        <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="Insumos">Insumos</SelectItem>
-                                            <SelectItem value="Producción">Producción</SelectItem>
+                                            <SelectItem value="Insumos">Insumos (MP)</SelectItem>
+                                            <SelectItem value="Producción">Producción (PT)</SelectItem>
                                             <SelectItem value="Empaque">Empaque</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Unidad Base</Label>
+                                    <Input
+                                        className="col-span-3"
+                                        value={newItem.unit}
+                                        onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                                        placeholder="ej. Kg"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Unidad Compra</Label>
+                                    <Input
+                                        className="col-span-3"
+                                        value={newItem.purchasing_unit}
+                                        onChange={(e) => setNewItem({ ...newItem, purchasing_unit: e.target.value })}
+                                        placeholder="ej. Saco 50Kg"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Factor Conv.</Label>
+                                    <Input
+                                        type="number"
+                                        className="col-span-3"
+                                        value={newItem.conversion_factor}
+                                        onChange={(e) => setNewItem({ ...newItem, conversion_factor: e.target.value })}
+                                        placeholder="Cuantas Unidades Base hay en 1 Unidad Compra"
+                                    />
+                                </div>
                             </div>
                             <DialogFooter>
-                                <Button type="submit" onClick={handleCreate}>Guardar Artículo</Button>
+                                <Button type="submit" onClick={handleCreate}>Guardar Maestro</Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -231,10 +325,10 @@ export default function InventoryPage() {
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                        <CardTitle className="text-sm font-medium">Items Totales</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$1,234,567</div>
+                        <div className="text-2xl font-bold">{items.length}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -242,15 +336,15 @@ export default function InventoryPage() {
                         <CardTitle className="text-sm font-medium">Bajo Stock</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-orange-500">{items.filter(i => i.stock < 100).length} Items</div>
+                        <div className="text-2xl font-bold text-orange-500">{items.filter(i => i.total_stock < 100).length} Items</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Categorías</CardTitle>
+                        <CardTitle className="text-sm font-medium">Almacenes Activos</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">4 Activas</div>
+                        <div className="text-2xl font-bold">{warehouses.length}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -258,7 +352,7 @@ export default function InventoryPage() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
-                        <CardTitle>Listado de Artículos</CardTitle>
+                        <CardTitle>Maestro de Artículos y Stock Global</CardTitle>
                         <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm"><Filter className="mr-2 h-4 w-4" /> Filtrar</Button>
                             <Button variant="outline" size="sm"><ArrowUpDown className="mr-2 h-4 w-4" /> Ordenar</Button>
@@ -272,14 +366,14 @@ export default function InventoryPage() {
                                 <TableHead className="w-[100px]">Código</TableHead>
                                 <TableHead>Descripción</TableHead>
                                 <TableHead>Categoría</TableHead>
-                                <TableHead className="text-right">Stock Actual</TableHead>
+                                <TableHead className="text-right">Stock Total</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-24">Cargando inventario...</TableCell>
+                                    <TableCell colSpan={5} className="text-center h-24">Sincronizando WMS...</TableCell>
                                 </TableRow>
                             ) : items.map((item) => (
                                 <TableRow key={item.id}>
@@ -291,11 +385,11 @@ export default function InventoryPage() {
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-right font-bold">
-                                        {item.stock} {item.unit}
+                                        {item.total_stock} {item.unit}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="sm" asChild>
-                                            <Link href={`/inventory/${item.id}`}>Ver</Link>
+                                            <Link href={`/inventory/${item.id}`}>Detalle</Link>
                                         </Button>
                                     </TableCell>
                                 </TableRow>
