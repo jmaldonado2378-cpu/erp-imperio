@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -18,26 +19,57 @@ import {
 import { Truck, Phone, Mail, MapPin, Plus } from "lucide-react"
 import { toast } from "sonner"
 
-const initialSuppliers = [
-    { id: 1, name: "Molino Cañuelas", contact: "Juan Pérez", phone: "+54 11 1234-5678", email: "ventas@molinocanuelas.com", category: "Harinas" },
-    { id: 2, name: "Distribuidora El Trebol", contact: "María González", phone: "+54 11 8765-4321", email: "pedidos@eltrebol.com.ar", category: "Lácteos/Grasas" },
-    { id: 3, name: "Papelera Del Sur", contact: "Roberto Díaz", phone: "+54 221 456-7890", email: "info@papeleradelsur.com", category: "Empaque" },
-]
-
 export default function SuppliersPage() {
-    const [suppliers, setSuppliers] = useState(initialSuppliers)
+    const [suppliers, setSuppliers] = useState<any[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [newSupplier, setNewSupplier] = useState({ name: "", contact: "", phone: "", email: "" })
+    const [loading, setLoading] = useState(true)
 
-    const handleCreate = () => {
+    // Fetch Suppliers
+    const fetchSuppliers = async () => {
+        setLoading(true)
+        const { data, error } = await supabase
+            .from('proveedores')
+            .select('*')
+            .order('id', { ascending: true })
+
+        if (error) {
+            console.error(error)
+            toast.error("Error cargando proveedores")
+        } else {
+            setSuppliers(data || [])
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchSuppliers()
+    }, [])
+
+    const handleCreate = async () => {
         if (!newSupplier.name) {
             toast.error("El nombre de la empresa es obligatorio")
             return
         }
-        setSuppliers([...suppliers, { ...newSupplier, id: suppliers.length + 1, category: "General" }])
-        setIsDialogOpen(false)
-        setNewSupplier({ name: "", contact: "", phone: "", email: "" })
-        toast.success("Proveedor registrado correctamente")
+
+        const { error } = await supabase
+            .from('proveedores')
+            .insert([{
+                name: newSupplier.name,
+                contact: newSupplier.contact,
+                phone: newSupplier.phone,
+                email: newSupplier.email,
+                category: "General" // Default or add selector
+            }])
+
+        if (error) {
+            toast.error("Error al crear proveedor: " + error.message)
+        } else {
+            toast.success("Proveedor registrado correctamente")
+            setIsDialogOpen(false)
+            setNewSupplier({ name: "", contact: "", phone: "", email: "" })
+            fetchSuppliers()
+        }
     }
 
     return (
@@ -123,7 +155,11 @@ export default function SuppliersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {suppliers.map((s) => (
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center h-24">Cargando proveedores...</TableCell>
+                                </TableRow>
+                            ) : suppliers.map((s) => (
                                 <TableRow key={s.id}>
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">

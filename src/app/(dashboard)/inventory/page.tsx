@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { supabase } from "@/lib/supabase/client"
 import {
     Table,
     TableBody,
@@ -34,47 +35,86 @@ import { Plus, Search, Filter, ArrowUpDown } from "lucide-react"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 
-const initialItems = [
-    { id: 1, code: "HAR-000-01", description: "Harina de Trigo 000", category: "Insumos", stock: 1500, unit: "Kg" },
-    { id: 2, code: "LEV-FRE-01", description: "Levadura Fresca Prensada", category: "Insumos", stock: 25, unit: "Kg" },
-    { id: 3, code: "GRA-MAR-01", description: "Margarina para Hojaldre", category: "Insumos", stock: 80, unit: "Kg" },
-    { id: 4, code: "AZU-BLA-01", description: "Azúcar Blanco Común", category: "Insumos", stock: 200, unit: "Kg" },
-    { id: 5, code: "SAL-FIN-01", description: "Sal Fina Yodada", category: "Insumos", stock: 50, unit: "Kg" },
-]
-
 export default function InventoryPage() {
-    const [items, setItems] = useState(initialItems)
+    const [items, setItems] = useState<any[]>([])
     const [isNewItemOpen, setIsNewItemOpen] = useState(false)
     const [isPurchaseOpen, setIsPurchaseOpen] = useState(false)
-    const [newItem, setNewItem] = useState({ code: "", description: "", category: "", stock: 0, unit: "Kg" })
+    const [newItem, setNewItem] = useState({ code: "", description: "", category: "Insumos", stock: 0, unit: "Kg" })
     const [purchase, setPurchase] = useState({ itemId: "", qty: "" })
+    const [loading, setLoading] = useState(true)
 
-    const handleCreate = () => {
+    // Fetch Items from Supabase
+    const fetchItems = async () => {
+        setLoading(true)
+        const { data, error } = await supabase
+            .from('insumos')
+            .select('*')
+            .order('id', { ascending: true })
+
+        if (error) {
+            console.error(error)
+            toast.error("Error cargando inventario")
+        } else {
+            setItems(data || [])
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchItems()
+    }, [])
+
+    const handleCreate = async () => {
         if (!newItem.code || !newItem.description) {
             toast.error("Complete todos los campos obligatorios")
             return
         }
-        setItems([...items, { ...newItem, id: items.length + 1 }])
-        setIsNewItemOpen(false)
-        setNewItem({ code: "", description: "", category: "", stock: 0, unit: "Kg" })
-        toast.success("Artículo creado correctamente")
+
+        const { error } = await supabase
+            .from('insumos')
+            .insert([{
+                code: newItem.code,
+                description: newItem.description,
+                category: newItem.category,
+                // stock defaults to 0 if not provided or provided
+                unit: newItem.unit
+            }])
+
+        if (error) {
+            toast.error("Error al crear artículo: " + error.message)
+        } else {
+            toast.success("Artículo creado correctamente")
+            setIsNewItemOpen(false)
+            setNewItem({ code: "", description: "", category: "Insumos", stock: 0, unit: "Kg" })
+            fetchItems() // Refresh list
+        }
     }
 
-    const handlePurchase = () => {
+    const handlePurchase = async () => {
         if (!purchase.itemId || !purchase.qty) {
             toast.error("Seleccione un item y cantidad")
             return
         }
-        const updatedItems = items.map(item => {
-            if (item.id.toString() === purchase.itemId) {
-                return { ...item, stock: item.stock + Number(purchase.qty) }
-            }
-            return item
-        })
-        setItems(updatedItems)
-        setIsPurchaseOpen(false)
-        setPurchase({ itemId: "", qty: "" })
-        toast.success("Stock actualizado correctamente")
+
+        // Optimistic UI update or fetch? Let's do fetch for safety first.
+        const currentItem = items.find(i => i.id.toString() === purchase.itemId)
+        if (!currentItem) return
+
+        const newStock = Number(currentItem.stock) + Number(purchase.qty)
+
+        const { error } = await supabase
+            .from('insumos')
+            .update({ stock: newStock })
+            .eq('id', purchase.itemId)
+
+        if (error) {
+            toast.error("Error al actualizar stock: " + error.message)
+        } else {
+            toast.success("Compra registrada. Stock actualizado.")
+            setIsPurchaseOpen(false)
+            setPurchase({ itemId: "", qty: "" })
+            fetchItems()
+        }
     }
 
     return (
@@ -237,7 +277,11 @@ export default function InventoryPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {items.map((item) => (
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-24">Cargando inventario...</TableCell>
+                                </TableRow>
+                            ) : items.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-mono font-medium">{item.code}</TableCell>
                                     <TableCell>{item.description}</TableCell>
@@ -253,7 +297,6 @@ export default function InventoryPage() {
                                         <Button variant="ghost" size="sm" asChild>
                                             <Link href={`/inventory/${item.id}`}>Ver</Link>
                                         </Button>
-                                        {/* Added delete/edit placeholder if needed, users asked for "actions" generally */}
                                     </TableCell>
                                 </TableRow>
                             ))}

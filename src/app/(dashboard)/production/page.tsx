@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { supabase } from "@/lib/supabase/client"
 import {
     Dialog,
     DialogContent,
@@ -19,49 +20,90 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChefHat, Info, Scale } from "lucide-react"
 
-const initialRecipes = [
-    {
-        id: 1,
-        parent: "Pan Baguette (x100u)",
-        ingredients: [
-            { name: "Harina 000", qty: 25, unit: "Kg" },
-            { name: "Levadura", qty: 0.5, unit: "Kg" },
-            { name: "Agua", qty: 15, unit: "L" },
-            { name: "Sal", qty: 0.4, unit: "Kg" }
-        ]
-    },
-    {
-        id: 2,
-        parent: "Medialunas (x12u)",
-        ingredients: [
-            { name: "Harina 000", qty: 0.5, unit: "Kg" },
-            { name: "Manteca", qty: 0.2, unit: "Kg" },
-            { name: "Azúcar", qty: 0.1, unit: "Kg" },
-            { name: "Leche", qty: 0.2, unit: "L" }
-        ]
-    },
-]
-
 export default function ProductionPage() {
-    const [recipes, setRecipes] = useState(initialRecipes)
+    const [recipes, setRecipes] = useState<any[]>([])
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [newRecipe, setNewRecipe] = useState({ name: "", base: "" })
+    const [loading, setLoading] = useState(true)
 
-    const handleCreate = () => {
+    // Fetch Recipes with Ingredients
+    const fetchRecipes = async () => {
+        setLoading(true)
+        const { data: recipesData, error } = await supabase
+            .from('recetas')
+            .select(`
+                id,
+                name,
+                description,
+                receta_ingredientes (
+                    id,
+                    ingredient_name,
+                    qty,
+                    unit
+                )
+            `)
+            .order('id', { ascending: true })
+
+        if (error) {
+            console.error(error)
+            toast.error("Error cargando recetas")
+        } else {
+            // Transform data structure to match UI expectations if needed
+            // The query returns details in 'receta_ingredientes' array
+            const formatted = recipesData?.map(r => ({
+                id: r.id,
+                parent: r.name,
+                ingredients: r.receta_ingredientes.map((ri: any) => ({
+                    name: ri.ingredient_name,
+                    qty: ri.qty,
+                    unit: ri.unit
+                }))
+            })) || []
+            setRecipes(formatted)
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchRecipes()
+    }, [])
+
+    const handleCreate = async () => {
         if (!newRecipe.name) {
             toast.error("El nombre de la receta es obligatorio")
             return
         }
-        setRecipes([...recipes, {
-            id: recipes.length + 1,
-            parent: newRecipe.name,
-            ingredients: [
-                { name: "Harina Base", qty: Number(newRecipe.base) || 1, unit: "Kg" }
-            ]
-        }])
+
+        // 1. Create Recipe
+        const { data: recipeData, error: recipeError } = await supabase
+            .from('recetas')
+            .insert([{ name: newRecipe.name, description: "Receta creada por usuario" }])
+            .select()
+            .single()
+
+        if (recipeError) {
+            toast.error("Error creando receta: " + recipeError.message)
+            return
+        }
+
+        // 2. Create Base Ingredient (Harina)
+        if (newRecipe.base) {
+            const { error: ingError } = await supabase
+                .from('receta_ingredientes')
+                .insert([{
+                    recipe_id: recipeData.id,
+                    ingredient_name: "Harina Base",
+                    qty: Number(newRecipe.base),
+                    unit: "Kg"
+                }])
+
+            if (ingError) console.error("Error adding base ingredient", ingError)
+        }
+
+        toast.success("Receta creada exitosamente")
         setIsDialogOpen(false)
         setNewRecipe({ name: "", base: "" })
-        toast.success("Receta creada exitosamente")
+        fetchRecipes()
     }
 
     return (
@@ -113,7 +155,7 @@ export default function ProductionPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-                {recipes.map((recipe) => (
+                {loading ? <p>Cargando recetas...</p> : recipes.map((recipe) => (
                     <Card key={recipe.id}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -131,8 +173,8 @@ export default function ProductionPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {recipe.ingredients.map((ing, i) => {
-                                        const flour = recipe.ingredients.find(i => i.name.includes("Harina"))?.qty || 1
+                                    {recipe.ingredients.map((ing: any, i: number) => {
+                                        const flour = recipe.ingredients.find((i: any) => i.name.includes("Harina"))?.qty || 1
                                         const pct = ((ing.qty / flour) * 100).toFixed(1)
 
                                         return (
